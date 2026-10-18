@@ -5,21 +5,36 @@ const crypto = require('crypto');
 
 const file = () => path.join(app.getPath('userData'), 'servers.json');
 
+// A missing file is an empty list. An unreadable one is an error, not an empty
+// list: returning [] here would let the next save overwrite every server.
 function load() {
+  let raw;
   try {
-    const raw = fs.readFileSync(file(), 'utf8');
-    const data = JSON.parse(raw);
-    return Array.isArray(data.servers) ? data.servers : [];
+    raw = fs.readFileSync(file(), 'utf8');
   } catch (err) {
-    if (err.code !== 'ENOENT') console.error('store: failed to read servers.json', err);
-    return [];
+    if (err.code === 'ENOENT') return [];
+    throw err;
   }
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`servers.json is corrupt and was left untouched (${file()}): ${err.message}`);
+  }
+  if (!data || !Array.isArray(data.servers)) {
+    throw new Error(`servers.json has no server list and was left untouched (${file()})`);
+  }
+  return data.servers;
 }
 
+// Write to a temp file and rename over the original, so a crash mid-write
+// leaves either the old file or the new one, never half of one.
 function save(servers) {
-  const dir = path.dirname(file());
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(file(), JSON.stringify({ servers }, null, 2), { mode: 0o600 });
+  const target = file();
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const temp = `${target}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, JSON.stringify({ servers }, null, 2), { mode: 0o600 });
+  fs.renameSync(temp, target);
 }
 
 function normalize(input) {

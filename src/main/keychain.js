@@ -16,8 +16,14 @@ function run(args, input) {
 
 // -w with no value reads the password from stdin, so it never appears in the
 // process list where any other user on the machine could see it.
+//
+// `security` prompts twice ("password data" then "retype password") and reads
+// one line for each. Sending the password once makes the retype read EOF, the
+// two disagree, and it silently stores an empty password with exit status 0.
+// So the password goes in twice, and a newline in it would split those lines.
 async function set(id, password) {
-  await run(['add-generic-password', '-a', id, '-s', SERVICE, '-U', '-w'], password);
+  if (/[\r\n]/.test(password)) throw new Error('Passwords cannot contain line breaks.');
+  await run(['add-generic-password', '-a', id, '-s', SERVICE, '-U', '-w'], `${password}\n${password}\n`);
 }
 
 async function get(id) {

@@ -30,7 +30,17 @@ let activeId = null;
 /* ---------------- server list ---------------- */
 
 async function refreshServers() {
-  servers = await window.api.listServers();
+  try {
+    servers = await window.api.listServers();
+  } catch (err) {
+    servers = [];
+    listEl.innerHTML = '';
+    const note = document.createElement('p');
+    note.className = 'empty-list';
+    note.textContent = err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    listEl.append(note);
+    return;
+  }
   renderList();
 }
 
@@ -204,17 +214,19 @@ function markDead(sessionId) {
   renderList();
 }
 
-function closeTab(sessionId) {
+function closeTab(sessionId, { force = false } = {}) {
   const entry = tabs.get(sessionId);
   if (!entry) return;
 
   const label = entry.server.name || entry.server.host;
   const what = entry.kind === 'files'
-    ? `Close the file browser for ${label}?`
+    ? entry.view.busy()
+      ? `A transfer for ${label} is still running. Closing stops it and leaves a partial file. Close anyway?`
+      : `Close the file browser for ${label}?`
     : entry.dead
       ? `Close this finished session for ${label}?`
       : `Close this tab? The SSH session to ${label} will be disconnected.`;
-  if (!window.confirm(what)) return;
+  if (!force && !window.confirm(what)) return;
 
   if (entry.kind === 'term') {
     window.api.killSession(sessionId);
@@ -301,17 +313,21 @@ formEl.onsubmit = async (event) => {
   if (mode === 'key' && !formEl.pemPath.value) return showError('Pick a PEM key file.');
   if (mode === 'password' && !password && !existing?.hasPassword) return showError('Enter a password.');
 
-  await window.api.saveServer({
-    id: editingId,
-    name: formEl.name.value,
-    provider: formEl.provider.value,
-    host: formEl.host.value,
-    user: formEl.user.value,
-    port: formEl.port.value,
-    pemPath: mode === 'key' ? formEl.pemPath.value : '',
-    password: mode === 'password' ? password : '',
-    hasPassword: mode === 'password' && (Boolean(password) || Boolean(existing?.hasPassword))
-  });
+  try {
+    await window.api.saveServer({
+      id: editingId,
+      name: formEl.name.value,
+      provider: formEl.provider.value,
+      host: formEl.host.value,
+      user: formEl.user.value,
+      port: formEl.port.value,
+      pemPath: mode === 'key' ? formEl.pemPath.value : '',
+      password: mode === 'password' ? password : '',
+      hasPassword: mode === 'password' && (Boolean(password) || Boolean(existing?.hasPassword))
+    });
+  } catch (err) {
+    return showError(err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
+  }
 
   closeForm();
   refreshServers();
@@ -324,7 +340,18 @@ function showError(message) {
 
 deleteBtn.onclick = async () => {
   if (!editingId) return;
-  await window.api.deleteServer(editingId);
+  const server = servers.find((s) => s.id === editingId);
+  const label = server ? server.name || server.host : 'this server';
+  const live = [...tabs.values()].some((t) => t.server.id === editingId && !t.dead);
+  const message = `Delete ${label}? Its saved password is removed from the Keychain.` +
+    (live ? ' Its open sessions and file browser will be closed.' : '');
+  if (!window.confirm(message)) return;
+
+  const id = editingId;
+  await window.api.deleteServer(id);
+  for (const [tabId, t] of [...tabs]) {
+    if (t.server.id === id) closeTab(tabId, { force: true });
+  }
   closeForm();
   refreshServers();
 };
@@ -353,5 +380,10 @@ window.addEventListener('resize', () => {
   const entry = activeId && tabs.get(activeId);
   if (entry && entry.kind === 'term') entry.fit.fit();
 });
+
+// A file dragged in from Finder must not open as a page. The file panes handle
+// their own pane-to-pane drops before these run.
+document.addEventListener('dragover', (event) => event.preventDefault());
+document.addEventListener('drop', (event) => event.preventDefault());
 
 refreshServers();

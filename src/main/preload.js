@@ -1,5 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Subscribe to a main-process push. Returns a function that unsubscribes, so a
+// view that goes away can stop listening.
+function listen(channel, handler) {
+  const listener = (_e, payload) => handler(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
 contextBridge.exposeInMainWorld('api', {
   listServers: () => ipcRenderer.invoke('servers:list'),
   saveServer: (server) => ipcRenderer.invoke('servers:save', server),
@@ -11,8 +19,8 @@ contextBridge.exposeInMainWorld('api', {
   resizeSession: (sessionId, cols, rows) => ipcRenderer.send('session:resize', { sessionId, cols, rows }),
   killSession: (sessionId) => ipcRenderer.send('session:kill', { sessionId }),
 
-  onSessionData: (handler) => ipcRenderer.on('session:data', (_e, payload) => handler(payload)),
-  onSessionExit: (handler) => ipcRenderer.on('session:exit', (_e, payload) => handler(payload)),
+  onSessionData: (handler) => listen('session:data', handler),
+  onSessionExit: (handler) => listen('session:exit', handler),
 
   localHome: () => ipcRenderer.invoke('local:home'),
   localList: (dir) => ipcRenderer.invoke('local:list', dir),
@@ -28,11 +36,11 @@ contextBridge.exposeInMainWorld('api', {
   remoteDisconnect: (serverId) => ipcRenderer.invoke('remote:disconnect', serverId),
 
   remoteIsConnected: (serverId) => ipcRenderer.invoke('remote:isConnected', serverId),
-  onRemoteStatus: (handler) => ipcRenderer.on('remote:status', (_e, payload) => handler(payload)),
+  onRemoteStatus: (handler) => listen('remote:status', handler),
 
   getSavedPaths: (serverId) => ipcRenderer.invoke('paths:get', serverId),
   savePath: (serverId, side, dir) => ipcRenderer.send('paths:set', { serverId, side, dir }),
 
   runTransfer: (payload) => ipcRenderer.invoke('transfer:run', payload),
-  onTransferProgress: (handler) => ipcRenderer.on('transfer:progress', (_e, payload) => handler(payload))
+  onTransferProgress: (handler) => listen('transfer:progress', handler)
 });

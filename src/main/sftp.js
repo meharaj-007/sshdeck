@@ -6,6 +6,10 @@ const path = require('path');
 const os = require('os');
 
 const connections = new Map(); // serverId -> { client, sftp }
+// Connects still in flight. A second caller during the handshake shares this
+// promise instead of opening (and logging in with) a second connection.
+const pending = new Map(); // serverId -> Promise<sftp>
+const abandoned = new Set(); // serverIds disconnected while their connect was in flight
 
 // Connecting takes a few seconds (TCP, key exchange, auth), so the renderer is
 // told where it is rather than being left on a bare spinner.
@@ -58,9 +62,20 @@ function verifyHostKey(host, port, blob) {
 function connect(server, secret) {
   const existing = connections.get(server.id);
   if (existing) return Promise.resolve(existing.sftp);
+  if (pending.has(server.id)) return pending.get(server.id);
 
   announce(server.id, 'connecting');
 
+  abandoned.delete(server.id);
+  const attempt = open(server, secret).finally(() => {
+    pending.delete(server.id);
+    abandoned.delete(server.id);
+  });
+  pending.set(server.id, attempt);
+  return attempt;
+}
+
+function open(server, secret) {
   return new Promise((resolve, reject) => {
     const client = new Client();
     const config = {
@@ -91,18 +106,27 @@ function connect(server, secret) {
           client.end();
           return reject(err);
         }
+        if (abandoned.has(server.id)) {
+          client.end();
+          return reject(new Error('Disconnected'));
+        }
         connections.set(server.id, { client, sftp });
         announce(server.id, 'connected');
         resolve(sftp);
       });
     });
+    // Only forget the cached entry if it is this client's: an old client closing
+    // late must not evict the connection that replaced it.
+    const forget = () => {
+      if (connections.get(server.id)?.client === client) connections.delete(server.id);
+    };
     client.on('error', (err) => {
-      connections.delete(server.id);
+      forget();
       announce(server.id, 'error', err.message);
       reject(err);
     });
     client.on('close', () => {
-      connections.delete(server.id);
+      forget();
       announce(server.id, 'closed');
     });
 
@@ -111,6 +135,7 @@ function connect(server, secret) {
 }
 
 function disconnect(serverId) {
+  if (pending.has(serverId)) abandoned.add(serverId);
   const entry = connections.get(serverId);
   if (!entry) return;
   connections.delete(serverId);
