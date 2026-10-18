@@ -92,9 +92,10 @@ open -a SSHDeck
 
 Then right-click the Dock icon -> Options -> Keep in Dock.
 
-The build is signed with whatever local identity is in the Keychain, which is an Apple Development
-certificate rather than a Developer ID. That is fine for running it on this machine, but `spctl`
-rejects it, so it is not distributable to other Macs without a Developer ID and notarization.
+The build is ad-hoc signed (`"identity": null` under `build.mac`), so electron-builder never picks
+up a personal signing certificate from the Keychain and embeds its owner's name in a published DMG.
+That is fine for running it on this machine, but `spctl` rejects it, so other Macs need the
+Gatekeeper steps above until there is a Developer ID and notarization.
 
 Note that `open -a` passes the calling shell's environment to the app. Launching it from a shell
 that exports `ELECTRON_RUN_AS_NODE=1` makes the packaged app start as plain Node and exit
