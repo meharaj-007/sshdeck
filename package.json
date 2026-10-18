@@ -1,0 +1,39 @@
+{
+  "name": "sshdeck",
+  "productName": "SSHDeck",
+  "version": "1.0.0",
+  "description": "One-click SSH launcher for AWS and Hostinger servers",
+  "main": "src/main/main.js",
+  "author": "meharajulmahmmud@gmail.com",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "electron-rebuild -f -w node-pty",
+    "dist": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.sshdeck.app",
+    "productName": "SSHDeck",
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": "dmg",
+      "icon": "build/icon.icns"
+    }
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "node-pty": "^1.0.0",
+    "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

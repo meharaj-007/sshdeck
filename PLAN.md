@@ -1,0 +1,1 @@
+the plan is to login to remote server on AWS with one click. i have pem file, ip, username. it will read a file and show server named based on that. some servers are on aws, some are on hostinger. hostinger ones require password.

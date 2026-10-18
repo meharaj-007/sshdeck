@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+    <title>SSHDeck</title>
+    <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <span class="brand">SSHDeck</span>
+        </div>
+        <input id="search" class="search" type="search" placeholder="Search servers" autocomplete="off" />
+        <div id="server-list" class="server-list"></div>
+        <button id="add-server" class="add-btn">+ Add server</button>
+      </aside>
+
+      <main class="main">
+        <div id="tabs" class="tabs"></div>
+        <div id="terminals" class="terminals">
+          <div id="empty" class="empty">
+            <h1>No session open</h1>
+            <p>Pick a server on the left to connect. <kbd>⌘N</kbd> adds one, <kbd>⌘W</kbd> closes a tab.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div id="modal" class="modal" hidden>
+      <form id="server-form" class="sheet">
+        <h2 id="modal-title">Add server</h2>
+        <label>Name<input name="name" required placeholder="prod-api" /></label>
+        <div class="row">
+          <label>Provider
+            <select name="provider">
+              <option value="aws">AWS</option>
+              <option value="hostinger">Hostinger</option>
+            </select>
+          </label>
+          <label>Port<input name="port" type="number" min="1" max="65535" value="22" /></label>
+        </div>
+        <div class="row">
+          <label class="grow">Host / IP<input name="host" required placeholder="13.51.0.1" /></label>
+          <label>User<input name="user" placeholder="ubuntu" /></label>
+        </div>
+
+        <div class="auth-toggle">
+          <label><input type="radio" name="auth" value="key" checked /> PEM key</label>
+          <label><input type="radio" name="auth" value="password" /> Password</label>
+        </div>
+
+        <div id="key-field" class="field">
+          <div class="picker">
+            <input name="pemPath" placeholder="~/.ssh/key.pem" readonly />
+            <button type="button" id="browse-key" class="ghost">Browse…</button>
+          </div>
+        </div>
+
+        <div id="password-field" class="field" hidden>
+          <input name="password" type="password" placeholder="Password" autocomplete="off" />
+          <p class="hint">Stored in the macOS Keychain, never in the app's config file.</p>
+        </div>
+
+        <p id="form-error" class="error" hidden></p>
+
+        <div class="actions">
+          <button type="button" id="delete-server" class="danger" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" id="cancel" class="ghost">Cancel</button>
+          <button type="submit" class="primary">Save</button>
+        </div>
+      </form>
+    </div>
+
+    <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+    <script src="files.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>
