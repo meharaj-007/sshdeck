@@ -92,3 +92,7 @@ rm -rf node_modules/electron/dist
 ditto -x -k ~/Library/Caches/electron/*/electron-v*-darwin-arm64.zip node_modules/electron/dist
 printf 'Electron.app/Contents/MacOS/Electron' > node_modules/electron/path.txt
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). SSHDeck is released under the [MIT License](LICENSE).
