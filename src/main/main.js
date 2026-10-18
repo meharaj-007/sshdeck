@@ -30,9 +30,16 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   });
+
+  // The app is one page. Dropping a file on the window would otherwise navigate
+  // to it, throwing away the UI (and orphaning live sessions) and handing the
+  // dropped page the preload's window.api.
+  win.webContents.on('will-navigate', (event) => event.preventDefault());
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 }
 
@@ -65,7 +72,7 @@ ipcMain.handle('servers:save', async (_event, input) => {
 });
 
 ipcMain.handle('servers:delete', async (_event, id) => {
-  sessions.kill(id);
+  sessions.killServer(id);
   sftp.disconnect(id);
   store.remove(id);
   paths.remove(id);
@@ -98,6 +105,10 @@ ipcMain.handle('session:start', async (event, { sessionId, serverId, cols, rows 
     onData: (data) => send('session:data', { sessionId, data }),
     onExit: (exitCode) => send('session:exit', { sessionId, exitCode })
   });
+  // Passwords saved before the Keychain fix were stored empty.
+  if (server.hasPassword && !secret) {
+    notes.push('No password found in the Keychain for this server. Edit the server and enter it again.');
+  }
   return { notes };
 });
 

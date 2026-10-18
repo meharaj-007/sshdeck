@@ -186,7 +186,11 @@ window.createFilesView = function createFilesView(server) {
     if (connState === 'unknown') connState = yes ? 'connected' : 'idle';
   });
 
-  window.api.onRemoteStatus((payload) => {
+  // Every subscription is undone on dispose, or each closed file browser would
+  // keep a listener (and its whole DOM) alive for the rest of the run.
+  const unsubscribers = [];
+
+  unsubscribers.push(window.api.onRemoteStatus((payload) => {
     if (disposed || payload.serverId !== server.id) return;
     connState = payload.state;
     const pane = panes.remote;
@@ -201,7 +205,7 @@ window.createFilesView = function createFilesView(server) {
     if (payload.state === 'closed') {
       pane.statusEl.textContent = 'Disconnected — the next action reconnects.';
     }
-  });
+  }));
 
   function showOverlay(pane, text, { retry } = {}) {
     pane.overlayTextEl.textContent = text;
@@ -363,13 +367,15 @@ window.createFilesView = function createFilesView(server) {
   const transfers = new Map(); // transferId -> { total, transferred }
   let queue = Promise.resolve();
 
-  window.api.onTransferProgress(({ transferId, transferred, total }) => {
+  let pending = 0; // queued or running, so closing the tab can warn
+
+  unsubscribers.push(window.api.onTransferProgress(({ transferId, transferred, total }) => {
     const t = transfers.get(transferId);
     if (!t) return;
     t.transferred = transferred;
     t.total = total;
     barFill.style.width = `${total ? Math.round((transferred / total) * 100) : 0}%`;
-  });
+  }));
 
   function transferSelected(pane) {
     const source = pane;
@@ -381,6 +387,18 @@ window.createFilesView = function createFilesView(server) {
       return;
     }
 
+    // Both upload and download truncate the target, and the remote side is a
+    // production server, so replacing anything that already exists is asked first.
+    const existing = new Set(destination.entries.map((e) => e.name));
+    const clashes = items.filter((e) => existing.has(e.name)).map((e) => e.name);
+    if (clashes.length) {
+      const where = destination.remote ? server.name || server.host : 'this Mac';
+      const ok = window.confirm(
+        `Replace ${clashes.length} existing file(s) in ${destination.path} on ${where}?\n\n${clashes.join(', ')}`
+      );
+      if (!ok) return;
+    }
+
     for (const entry of items) {
       const transferId = `${Date.now()}-${entry.name}`;
       const localPath = source.remote
@@ -390,8 +408,12 @@ window.createFilesView = function createFilesView(server) {
         ? joinPath(source.path, entry.name)
         : joinPath(destination.path, entry.name);
 
+      pending += 1;
       queue = queue.then(async () => {
-        if (disposed) return;
+        if (disposed) {
+          pending -= 1;
+          return;
+        }
         transfers.set(transferId, { transferred: 0, total: entry.size });
         bar.hidden = false;
         barFill.style.width = '0%';
@@ -408,6 +430,7 @@ window.createFilesView = function createFilesView(server) {
         } catch (err) {
           barLabel.textContent = `${entry.name}: ${err.message.split(': ').pop()}`;
         } finally {
+          pending -= 1;
           transfers.delete(transferId);
           if (!transfers.size) setTimeout(() => { bar.hidden = transfers.size === 0 ? true : false; }, 1200);
         }
@@ -491,8 +514,12 @@ window.createFilesView = function createFilesView(server) {
   return {
     element: root,
     focus: () => root.focus(),
+    // Closing mid-transfer drops the connection and leaves a partial file, so
+    // the tab asks before doing that.
+    busy: () => pending > 0,
     dispose: () => {
       disposed = true;
+      unsubscribers.forEach((off) => off());
       window.api.remoteDisconnect(server.id);
     }
   };

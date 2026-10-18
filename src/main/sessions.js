@@ -94,8 +94,16 @@ function kill(id) {
   }
 }
 
+// Session ids are `${serverId}:${timestamp}`, so a server's sessions are found
+// by prefix; kill(serverId) on its own would match nothing.
+function killServer(serverId) {
+  for (const id of [...sessions.keys()]) {
+    if (id.startsWith(`${serverId}:`)) kill(id);
+  }
+}
+
 function killAll() {
   for (const id of [...sessions.keys()]) kill(id);
 }
 
-module.exports = { start, write, resize, kill, killAll };
+module.exports = { start, write, resize, kill, killServer, killAll };

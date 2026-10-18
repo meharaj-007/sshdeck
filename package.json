@@ -32,8 +32,8 @@
     "ssh2": "^1.17.0"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.7.1",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "@electron/rebuild": "^4.2.1",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
   }
 }

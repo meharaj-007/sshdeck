@@ -64,7 +64,25 @@ src/main/keychain.js   macOS Keychain wrapper around the `security` CLI
 src/renderer/          UI: server list, tabs, terminals, add/edit form
 ```
 
-## Installing (Dock)
+## Installing from a release
+
+Download the DMG from [Releases](https://github.com/meharaj-007/sshdeck/releases). Builds are
+Apple Silicon (arm64) only.
+
+The app is not notarized, so macOS blocks the first launch. On macOS 15 and later, right-click →
+Open no longer gets past this. Instead:
+
+1. Drag SSHDeck to Applications and try to open it once; macOS refuses.
+2. Open System Settings → Privacy & Security, scroll to the message about SSHDeck, and click
+   **Open Anyway**.
+
+Or clear the quarantine flag from a terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/SSHDeck.app
+```
+
+## Building and installing locally (Dock)
 
 ```bash
 npm run dist                            # builds dist/mac-arm64/SSHDeck.app and a DMG
